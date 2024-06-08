@@ -1,0 +1,19 @@
+Name: Đăng nhập hệ thống
+Goal: Cho phép người dùng đăng nhập vào hệ thống.
+Actors: Người dùng
+Preconditions: Người dùng đã có tài khoản.
+Postconditions: Người dùng đã đăng nhập thành công hoặc nhận được thông báo lỗi.
+Invariants: Hệ thống luôn yêu cầu tên đăng nhập và mật khẩu.
+Main Success Scenario: 1. Người dùng nhập tên đăng nhập và mật khẩu.
+2. Người dùng nhấn nút "Đăng nhập".
+3. Hệ thống xác thực thông tin đăng nhập.
+4. Nếu thông tin hợp lệ, hệ thống chuyển hướng người dùng đến trang chính.
+
+Variations: 1a. Người dùng nhập sai tên đăng nhập hoặc mật khẩu.
+3a. Hệ thống thông báo lỗi đăng nhập.
+
+Extensions: 1b. Người dùng quên mật khẩu.
+2b. Người dùng nhấn nút "Quên mật khẩu".
+3b. Hệ thống gửi email hướng dẫn khôi phục mật khẩu.
+
+Included Use Cases: Xác thực người dùng
