@@ -25,7 +25,7 @@ window.title("Use Case Description Tool")
 
 # Create labels and input fields
 labels = ["Name", "Goal", "Actors", "Preconditions", "Postconditions", "Invariants",
-          "Main Success Scenario", "Variations", "Extensions", "Included Use Cases"]
+        "Main Success Scenario", "Variations", "Extensions", "Included Use Cases"]
 entry_widgets = {}
 for label in labels:
     label_widget = ttk.Label(window, text=label)

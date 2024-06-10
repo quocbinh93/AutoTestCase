@@ -3,6 +3,10 @@ from tkinter import ttk, filedialog
 from graphviz import Digraph
 from deap import base, creator, tools, algorithms
 import random
+import re
+
+use_case_data = None
+filepath = None  # Biến toàn cục để lưu trữ đường dẫn file
 
 def browse_file():
     global filepath
@@ -12,32 +16,52 @@ def browse_file():
         filetypes=(("Text files", "*.txt*"), ("all files", "*.*"))
     )
 
-def generate_control_flow_diagram():
-    global filepath
-    if filepath:
-        with open(filepath, "r") as file:
-            use_case_data = file.read()
+def save_use_case():
+    global use_case_data
+    use_case_data = {
+        label: entry_widgets[label].get("1.0", tk.END) if isinstance(entry_widgets[label], tk.Text) else entry_widgets[label].get()
+        for label in labels
+    }
 
+    if filepath:  # Nếu đã chọn file, ghi đè lên file đó
+        with open(filepath, "w", encoding="utf-8") as file:
+            for key, value in use_case_data.items():
+                file.write(f"{key}: {value}\n")
+    else:  # Nếu chưa chọn file, mở hộp thoại lưu file
+        save_filepath = filedialog.asksaveasfilename(
+            initialdir="/",
+            title="Save Use Case",
+            filetypes=(("Text files", "*.txt*"), ("all files", "*.*")),
+            defaultextension=".txt"
+        )
+        if save_filepath:  # Nếu người dùng đã chọn nơi lưu file
+            with open(save_filepath, "w", encoding="utf-8") as file:
+                for key, value in use_case_data.items():
+                    file.write(f"{key}: {value}\n")
+
+def generate_control_flow_diagram():
+    global use_case_data
+    if not use_case_data:
+        save_use_case()  # Lưu dữ liệu trước khi tạo biểu đồ
+
+    if use_case_data:
         control_flow_graph = acfd(use_case_data)
         test_paths = generate_test_paths(control_flow_graph)
         visualize_control_flow_graph(control_flow_graph)
 
-        # Tối ưu hóa các trường hợp thử nghiệm
         optimized_test_cases = optimize_test_cases(test_paths, control_flow_graph)
-
-        # In ra các trường hợp thử nghiệm đã tối ưu
         for test_case in optimized_test_cases:
             print(test_case)
 
 # Triển khai thuật toán ACFD (Algorithm of Control Flow Diagram)
 def acfd(use_case_data):
     statements = extract_statements(use_case_data)
-    control_flow_graph = {}
+    control_flow_graph = {"Start": {"type": "start", "content": "Start Node", "next": None}}
     current_node = "Start"
 
     for statement in statements:
         statement_type = analyze_statement(statement)
-        new_node = f"Node_{len(control_flow_graph) + 1}"
+        new_node = f"Node_{len(control_flow_graph)}"
         control_flow_graph[new_node] = {"type": statement_type, "content": statement}
         control_flow_graph[current_node]["next"] = new_node
 
@@ -46,17 +70,23 @@ def acfd(use_case_data):
             false_node = f"Node_{len(control_flow_graph) + 1}"
             control_flow_graph[new_node]["true"] = true_node
             control_flow_graph[new_node]["false"] = false_node
-            current_node = true_node 
-
+            current_node = true_node
         else:
             current_node = new_node
 
     control_flow_graph[current_node]["next"] = "End"
+    control_flow_graph["End"] = {"type": "end", "content": "End Node"}
     return control_flow_graph
 
 # Hàm phụ trợ để trích xuất các bước từ use_case_data
 def extract_statements(use_case_data):
-    statements = [stmt.strip() for stmt in use_case_data.strip().split("\n") if stmt.strip()]
+    statements = []
+    for key in ["Main Success Scenario", "Variations", "Extensions"]:
+        if key in use_case_data:
+            scenario = use_case_data[key].strip()
+            # Tách các bước dựa trên số thứ tự (1., 2., 3., ...) hoặc chữ cái (1a., 3a., ...)
+            steps = re.split(r'\d+\.|\d+[a-z]\.', scenario)[1:]
+            statements.extend(step.strip() for step in steps)
     return statements
 
 # Hàm phụ trợ để phân tích cú pháp một bước
@@ -119,7 +149,7 @@ def evaluate_test_case(individual, control_flow_graph):
             covered_transitions.add((current_node, control_flow_graph[current_node]["next"]))
             current_node = control_flow_graph[current_node]["next"]
 
-    return len(covered_transitions),  # Trả về số lượng chuyển tiếp được bao phủ
+    return len(covered_transitions),
 
 def optimize_test_cases(test_paths, control_flow_graph):
     creator.create("FitnessMax", base.Fitness, weights=(1.0,))
@@ -144,19 +174,35 @@ def optimize_test_cases(test_paths, control_flow_graph):
             ind.fitness.values = fit
         population = toolbox.select(offspring, k=len(population))
 
-    best_individuals = tools.selBest(population, k=5)  # Chọn ra 5 cá thể tốt nhất
+    best_individuals = tools.selBest(population, k=5)
     return best_individuals
 
-# Tạo cửa sổ giao diện
+# GUI
 window = tk.Tk()
-window.title("Use Case to Control Flow Diagram Tool")
+window.title("Use Case Description Tool")
 
-# Tạo nút "Browse" để chọn tệp use case
+# Create labels and input fields
+labels = ["Name", "Goal", "Actors", "Preconditions", "Postconditions", "Invariants",
+          "Main Success Scenario", "Variations", "Extensions", "Included Use Cases"]
+entry_widgets = {}
+for label in labels:
+    label_widget = ttk.Label(window, text=label)
+    label_widget.pack()
+    if label in ["Main Success Scenario", "Variations", "Extensions"]:
+        entry_widget = tk.Text(window, height=5)
+    else:
+        entry_widget = ttk.Entry(window)
+    entry_widget.pack()
+    entry_widgets[label] = entry_widget
+
+# Tạo nút "Browse", "Generate" và "Save"
 browse_button = ttk.Button(window, text="Browse", command=browse_file)
 browse_button.pack()
 
-# Tạo nút "Generate" để tạo biểu đồ luồng điều khiển
 generate_button = ttk.Button(window, text="Generate", command=generate_control_flow_diagram)
 generate_button.pack()
+
+save_button = ttk.Button(window, text="Save", command=save_use_case)
+save_button.pack()
 
 window.mainloop()
